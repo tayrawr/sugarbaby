@@ -12,7 +12,10 @@ const STORAGE_KEYS = {
   AUTO_SYNC: 'sugarbaby_gdrive_auto_sync',
 };
 
-// Fallback / standard demo client ID or environment variable
+export const DEFAULT_GOOGLE_CLIENT_ID =
+  '42613205860-kjulbdb20vf9604o8tuoi82p2udf2pbv.apps.googleusercontent.com';
+
+// Fallback / standard client ID or environment variable
 export function getActiveClientId(): string {
   const custom = localStorage.getItem(STORAGE_KEYS.CUSTOM_CLIENT_ID);
   if (custom && custom.trim()) {
@@ -22,8 +25,7 @@ export function getActiveClientId(): string {
   if (envId && envId.trim()) {
     return envId.trim();
   }
-  // Default public client ID placeholder for SugarBaby deployments
-  return '';
+  return DEFAULT_GOOGLE_CLIENT_ID;
 }
 
 export function setCustomClientId(clientId: string): void {
