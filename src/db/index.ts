@@ -7,6 +7,7 @@ import type {
   FoodPreset,
   HealthNote,
   UserSettings,
+  Tombstone,
 } from '../types';
 
 export class SugarBabyDatabase extends Dexie {
@@ -17,6 +18,7 @@ export class SugarBabyDatabase extends Dexie {
   foodPresets!: EntityTable<FoodPreset, 'id'>;
   healthNotes!: EntityTable<HealthNote, 'id'>;
   settings!: EntityTable<UserSettings, 'id'>;
+  tombstones!: EntityTable<Tombstone, 'id'>;
 
   constructor() {
     super('SugarBabyDB');
@@ -28,11 +30,37 @@ export class SugarBabyDatabase extends Dexie {
       foodPresets: 'id, petId, orderIndex',
       healthNotes: 'id, petId, timestamp',
       settings: 'id, activePetId',
+      tombstones: 'id, entityType, deletedAt',
     });
   }
 }
 
 export const db = new SugarBabyDatabase();
+
+export async function recordTombstone(
+  id: string,
+  entityType: Tombstone['entityType']
+): Promise<void> {
+  try {
+    await db.tombstones.put({
+      id,
+      entityType,
+      deletedAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error('Failed to record tombstone:', err);
+  }
+}
+
+export async function purgeExpiredTombstones(maxAgeDays = 60): Promise<void> {
+  try {
+    const cutoff = new Date(Date.now() - maxAgeDays * 24 * 60 * 60 * 1000).toISOString();
+    await db.tombstones.where('deletedAt').below(cutoff).delete();
+  } catch (err) {
+    console.error('Failed to purge expired tombstones:', err);
+  }
+}
+
 
 export async function initializeDatabase(): Promise<void> {
   const settingsCount = await db.settings.count();

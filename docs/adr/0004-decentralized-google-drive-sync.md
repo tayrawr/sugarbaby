@@ -1,0 +1,3 @@
+# Decentralized Google Drive Sync with Household Scope & Tombstones
+
+Caregivers need seamless, real-time cross-device and family synchronization without ongoing server hosting costs, centralized database attack vectors, or privacy risks. We decided to synchronize a single unified Household Data file (`SugarBaby_Household.json`) via Google Drive REST API using the sandboxed `drive.file` scope, paired with tombstone tracking for non-destructive offline reconciliation. This guarantees 100% free hosting, zero centralized attack surface, native Google Drive access control for family sharing, and reliable conflict-free merging across devices.

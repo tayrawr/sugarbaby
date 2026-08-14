@@ -5,6 +5,7 @@ import { ModalSheet } from '../common/ModalSheet';
 import { TimeDateSelector } from '../common/TimeDateSelector';
 import type { Dose, Pet, InjectionSite } from '../../types';
 import { db } from '../../db';
+import { triggerDebouncedAutoSync } from '../../utils/syncEngine';
 
 interface DoseModalProps {
   isOpen: boolean;
@@ -106,6 +107,7 @@ export const DoseModal: React.FC<DoseModalProps> = ({
         await db.doses.add(newDose);
       }
 
+      triggerDebouncedAutoSync();
       onSaved?.();
       onClose();
     } catch (err) {

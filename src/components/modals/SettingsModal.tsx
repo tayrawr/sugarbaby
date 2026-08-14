@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Settings, Check, Download, Upload, RefreshCw, Heart, Plus, Trash2 } from 'lucide-react';
+import { Settings, Check, Download, Upload, RefreshCw, Heart, Plus, Trash2, Cloud } from 'lucide-react';
 import { ModalSheet } from '../common/ModalSheet';
 import type { Pet, UserSettings, BgUnit } from '../../types';
-import { db, initializeDatabase } from '../../db';
+import { db, initializeDatabase, recordTombstone } from '../../db';
 import { exportToCsv, exportCompleteBackupJson, restoreCompleteBackupJson, downloadFile } from '../../utils/export';
+import { triggerDebouncedAutoSync } from '../../utils/syncEngine';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -14,6 +15,7 @@ interface SettingsModalProps {
   onSelectPet?: (petId: string) => void;
   onAddNewPet?: () => void;
   onUpdated?: () => void;
+  onOpenSync?: () => void;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -25,6 +27,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onSelectPet,
   onAddNewPet,
   onUpdated,
+  onOpenSync,
 }) => {
   const [name, setName] = useState(pet.name);
   const [avatarEmoji, setAvatarEmoji] = useState(pet.avatarEmoji || '🐱');
@@ -73,6 +76,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         bgUnit,
       });
 
+      triggerDebouncedAutoSync();
       onUpdated?.();
       onClose();
     } catch (err) {
@@ -92,6 +96,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         `Are you sure you want to delete ${petToDelete.name}'s profile and all associated records?`
       )
     ) {
+      await recordTombstone(petToDelete.id, 'pet');
+
       await db.transaction(
         'rw',
         [db.pets, db.readings, db.doses, db.feedings, db.foodPresets, db.healthNotes, db.settings],
@@ -109,6 +115,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           }
         }
       );
+
+      triggerDebouncedAutoSync();
       onUpdated?.();
     }
   };
@@ -356,7 +364,37 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
         {/* Data Backup & Export Section */}
         <div className="pt-3 border-t border-slate-800 space-y-2.5">
-          <div className="text-xs font-bold text-slate-300">Data Backup & Clinical Export</div>
+          <div className="text-xs font-bold text-slate-300 flex items-center justify-between">
+            <span>Data Backup & Clinical Export</span>
+          </div>
+
+          {onOpenSync && (
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                onOpenSync();
+              }}
+              className="w-full p-3 rounded-2xl bg-gradient-to-r from-indigo-950/60 to-slate-900 border border-indigo-500/30 hover:border-indigo-500/60 text-left transition-all flex items-center justify-between group"
+            >
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-indigo-600/20 text-indigo-400 flex items-center justify-center border border-indigo-500/30 group-hover:scale-105 transition-transform">
+                  <Cloud className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-white group-hover:text-indigo-300 transition-colors">
+                    Google Drive Cloud Sync & Sharing
+                  </div>
+                  <div className="text-[11px] text-slate-400">
+                    Sync in real-time across devices & invite family members
+                  </div>
+                </div>
+              </div>
+              <span className="text-xs font-bold text-indigo-400 group-hover:translate-x-0.5 transition-transform">
+                Configure →
+              </span>
+            </button>
+          )}
 
           <div className="grid grid-cols-2 gap-2">
             <button

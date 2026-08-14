@@ -129,3 +129,40 @@ export interface CycleGroup {
   minBgMgDl?: number;
   maxBgMgDl?: number;
 }
+
+export type SyncStatus = 'idle' | 'syncing' | 'synced' | 'offline' | 'error';
+
+export interface Tombstone {
+  id: string;
+  entityType: 'reading' | 'dose' | 'feeding' | 'foodPreset' | 'healthNote' | 'pet';
+  deletedAt: string; // ISO string
+}
+
+export interface HouseholdDataPayload {
+  version: number;
+  lastModified: string;
+  pets: Pet[];
+  readings: Reading[];
+  doses: Dose[];
+  feedings: Feeding[];
+  foodPresets: FoodPreset[];
+  healthNotes: HealthNote[];
+  settings: UserSettings[];
+  tombstones: Tombstone[];
+}
+
+export interface GoogleDriveSyncState {
+  isSignedIn: boolean;
+  userEmail: string | null;
+  userName: string | null;
+  userAvatar: string | null;
+  fileId: string | null;
+  fileName: string | null;
+  webViewLink: string | null;
+  lastSyncedAt: string | null;
+  status: SyncStatus;
+  errorMessage: string | null;
+  isAutoSyncEnabled: boolean;
+  customClientId?: string;
+}
+

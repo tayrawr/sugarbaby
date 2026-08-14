@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { Sparkles, Plus, Trash2, Edit2, Check, X } from 'lucide-react';
 import { ModalSheet } from '../common/ModalSheet';
 import type { FoodPreset, Pet } from '../../types';
-import { db } from '../../db';
+import { db, recordTombstone } from '../../db';
+import { triggerDebouncedAutoSync } from '../../utils/syncEngine';
 
 interface FoodPresetManagerModalProps {
   isOpen: boolean;
@@ -65,13 +66,16 @@ export const FoodPresetManagerModal: React.FC<FoodPresetManagerModalProps> = ({
       });
     }
 
+    triggerDebouncedAutoSync();
     cancelEdit();
     onUpdated?.();
   };
 
   const handleDelete = async (id: string) => {
     if (window.confirm('Delete this food preset?')) {
+      await recordTombstone(id, 'foodPreset');
       await db.foodPresets.delete(id);
+      triggerDebouncedAutoSync();
       if (editingId === id) cancelEdit();
       onUpdated?.();
     }

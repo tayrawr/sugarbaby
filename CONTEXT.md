@@ -43,3 +43,12 @@ _Avoid_: Normal zone, safe zone, ideal range.
 **Health Note**:
 A qualitative observation recording pet behavior, symptoms, or body weight changes.
 _Avoid_: Comment, memo, log entry.
+
+**Household Data**:
+The complete aggregate of Pet profiles, Readings, Doses, Feedings, Food Presets, and Health Notes for a caregiving unit.
+_Avoid_: Database export, account data, app state.
+
+**Cloud Sync File**:
+A shared, decentralized JSON document stored on Google Drive representing the Household Data for multi-device and family synchronization.
+_Avoid_: Remote database, backend store, sync document.
+

@@ -1,8 +1,17 @@
-import React from 'react';
-import { Settings, Sparkles, FileText } from 'lucide-react';
-import type { Pet, UserSettings, TimeWindow } from '../../types';
+import React, { useState, useEffect } from 'react';
+import {
+  Settings,
+  Sparkles,
+  FileText,
+  Cloud,
+  CloudCheck,
+  CloudAlert,
+  RefreshCw,
+} from 'lucide-react';
+import type { Pet, UserSettings, TimeWindow, GoogleDriveSyncState } from '../../types';
 import { TimeframeSelector } from '../dashboard/TimeframeSelector';
 import { PetSwitcher } from './PetSwitcher';
+import { getSyncState, subscribeToSyncState } from '../../utils/syncEngine';
 
 interface AppHeaderProps {
   pet: Pet;
@@ -15,6 +24,7 @@ interface AppHeaderProps {
   onOpenSettings: () => void;
   onOpenPresets: () => void;
   onOpenVetReport: () => void;
+  onOpenSync: () => void;
 }
 
 export const AppHeader: React.FC<AppHeaderProps> = ({
@@ -28,7 +38,78 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   onOpenSettings,
   onOpenPresets,
   onOpenVetReport,
+  onOpenSync,
 }) => {
+  const [syncState, setSyncState] = useState<GoogleDriveSyncState>(getSyncState());
+
+  useEffect(() => {
+    return subscribeToSyncState(setSyncState);
+  }, []);
+
+  const renderSyncBadge = (isMobile = false) => {
+    if (!syncState.isSignedIn) {
+      return (
+        <button
+          type="button"
+          onClick={onOpenSync}
+          className={`${
+            isMobile ? 'p-2' : 'px-2.5 py-1.5'
+          } rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-indigo-300 text-xs font-semibold flex items-center gap-1.5 transition-colors`}
+          title="Connect Google Drive Cloud Sync"
+        >
+          <Cloud className="w-3.5 h-3.5" />
+          {!isMobile && <span>Local</span>}
+        </button>
+      );
+    }
+
+    if (syncState.status === 'syncing') {
+      return (
+        <button
+          type="button"
+          onClick={onOpenSync}
+          className={`${
+            isMobile ? 'p-2' : 'px-2.5 py-1.5'
+          } rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 text-xs font-semibold flex items-center gap-1.5 transition-colors`}
+          title="Syncing with Google Drive..."
+        >
+          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+          {!isMobile && <span>Syncing</span>}
+        </button>
+      );
+    }
+
+    if (syncState.status === 'error') {
+      return (
+        <button
+          type="button"
+          onClick={onOpenSync}
+          className={`${
+            isMobile ? 'p-2' : 'px-2.5 py-1.5'
+          } rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-400 text-xs font-semibold flex items-center gap-1.5 transition-colors`}
+          title={syncState.errorMessage || 'Sync notice'}
+        >
+          <CloudAlert className="w-3.5 h-3.5" />
+          {!isMobile && <span>Sync Alert</span>}
+        </button>
+      );
+    }
+
+    return (
+      <button
+        type="button"
+        onClick={onOpenSync}
+        className={`${
+          isMobile ? 'p-2' : 'px-2.5 py-1.5'
+        } rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-xs font-semibold flex items-center gap-1.5 transition-colors`}
+        title="Google Drive Connected & Up to Date"
+      >
+        <CloudCheck className="w-3.5 h-3.5" />
+        {!isMobile && <span>Cloud Sync</span>}
+      </button>
+    );
+  };
+
   return (
     <header className="border-b border-slate-800 bg-slate-950/80 backdrop-blur-md sticky top-0 z-30 px-4 sm:px-6 py-3">
       <div className="max-w-6xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-3">
@@ -59,6 +140,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 
           {/* Mobile Quick Action Buttons */}
           <div className="flex items-center gap-1.5 md:hidden">
+            {renderSyncBadge(true)}
             <button
               type="button"
               onClick={onOpenPresets}
@@ -91,6 +173,8 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
           <TimeframeSelector value={activeTimeframe} onChange={onChangeTimeframe} />
 
           <div className="hidden md:flex items-center gap-2">
+            {renderSyncBadge(false)}
+
             <button
               type="button"
               onClick={onOpenPresets}
@@ -121,3 +205,4 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
     </header>
   );
 };
+

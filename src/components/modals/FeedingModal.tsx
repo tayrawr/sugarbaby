@@ -5,6 +5,7 @@ import { TimeDateSelector } from '../common/TimeDateSelector';
 import { AppetiteSlider } from '../common/AppetiteSlider';
 import type { Feeding, FoodPreset, Pet } from '../../types';
 import { db } from '../../db';
+import { triggerDebouncedAutoSync } from '../../utils/syncEngine';
 
 interface FeedingModalProps {
   isOpen: boolean;
@@ -91,6 +92,7 @@ export const FeedingModal: React.FC<FeedingModalProps> = ({
         await db.feedings.add(newFeeding);
       }
 
+      triggerDebouncedAutoSync();
       onSaved?.();
       onClose();
     } catch (err) {

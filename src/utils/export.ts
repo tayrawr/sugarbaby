@@ -89,7 +89,7 @@ export function downloadFile(content: string, fileName: string, contentType: str
 }
 
 export async function exportCompleteBackupJson(): Promise<string> {
-  const [pets, readings, doses, feedings, foodPresets, healthNotes, settings] = await Promise.all([
+  const [pets, readings, doses, feedings, foodPresets, healthNotes, settings, tombstones] = await Promise.all([
     db.pets.toArray(),
     db.readings.toArray(),
     db.doses.toArray(),
@@ -97,6 +97,7 @@ export async function exportCompleteBackupJson(): Promise<string> {
     db.foodPresets.toArray(),
     db.healthNotes.toArray(),
     db.settings.toArray(),
+    db.tombstones.toArray(),
   ]);
 
   const backupData = {
@@ -109,6 +110,7 @@ export async function exportCompleteBackupJson(): Promise<string> {
     foodPresets,
     healthNotes,
     settings,
+    tombstones,
   };
 
   return JSON.stringify(backupData, null, 2);
@@ -121,23 +123,29 @@ export async function restoreCompleteBackupJson(jsonString: string): Promise<boo
       throw new Error('Invalid SugarBaby backup file structure.');
     }
 
-    await db.transaction('rw', [db.pets, db.readings, db.doses, db.feedings, db.foodPresets, db.healthNotes, db.settings], async () => {
-      await db.pets.clear();
-      await db.readings.clear();
-      await db.doses.clear();
-      await db.feedings.clear();
-      await db.foodPresets.clear();
-      await db.healthNotes.clear();
-      await db.settings.clear();
+    await db.transaction(
+      'rw',
+      [db.pets, db.readings, db.doses, db.feedings, db.foodPresets, db.healthNotes, db.settings, db.tombstones],
+      async () => {
+        await db.pets.clear();
+        await db.readings.clear();
+        await db.doses.clear();
+        await db.feedings.clear();
+        await db.foodPresets.clear();
+        await db.healthNotes.clear();
+        await db.settings.clear();
+        await db.tombstones.clear();
 
-      if (data.pets?.length) await db.pets.bulkAdd(data.pets);
-      if (data.readings?.length) await db.readings.bulkAdd(data.readings);
-      if (data.doses?.length) await db.doses.bulkAdd(data.doses);
-      if (data.feedings?.length) await db.feedings.bulkAdd(data.feedings);
-      if (data.foodPresets?.length) await db.foodPresets.bulkAdd(data.foodPresets);
-      if (data.healthNotes?.length) await db.healthNotes.bulkAdd(data.healthNotes);
-      if (data.settings?.length) await db.settings.bulkAdd(data.settings);
-    });
+        if (data.pets?.length) await db.pets.bulkAdd(data.pets);
+        if (data.readings?.length) await db.readings.bulkAdd(data.readings);
+        if (data.doses?.length) await db.doses.bulkAdd(data.doses);
+        if (data.feedings?.length) await db.feedings.bulkAdd(data.feedings);
+        if (data.foodPresets?.length) await db.foodPresets.bulkAdd(data.foodPresets);
+        if (data.healthNotes?.length) await db.healthNotes.bulkAdd(data.healthNotes);
+        if (data.settings?.length) await db.settings.bulkAdd(data.settings);
+        if (data.tombstones?.length) await db.tombstones.bulkAdd(data.tombstones);
+      }
+    );
 
     return true;
   } catch (err) {
@@ -145,3 +153,4 @@ export async function restoreCompleteBackupJson(jsonString: string): Promise<boo
     return false;
   }
 }
+

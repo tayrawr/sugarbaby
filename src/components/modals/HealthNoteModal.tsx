@@ -4,6 +4,7 @@ import { ModalSheet } from '../common/ModalSheet';
 import { TimeDateSelector } from '../common/TimeDateSelector';
 import type { HealthNote, Pet } from '../../types';
 import { db } from '../../db';
+import { triggerDebouncedAutoSync } from '../../utils/syncEngine';
 
 interface HealthNoteModalProps {
   isOpen: boolean;
@@ -100,6 +101,7 @@ export const HealthNoteModal: React.FC<HealthNoteModalProps> = ({
         await db.healthNotes.add(newNote);
       }
 
+      triggerDebouncedAutoSync();
       onSaved?.();
       onClose();
     } catch (err) {

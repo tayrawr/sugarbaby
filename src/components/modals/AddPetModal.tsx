@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { Heart, Plus } from 'lucide-react';
 import { ModalSheet } from '../common/ModalSheet';
-import type { Pet, FoodPreset } from '../../types';
 import { db } from '../../db';
+import type { Pet, FoodPreset } from '../../types';
+import { triggerDebouncedAutoSync } from '../../utils/syncEngine';
 
 interface AddPetModalProps {
   isOpen: boolean;
@@ -61,6 +62,7 @@ export const AddPetModal: React.FC<AddPetModalProps> = ({ isOpen, onClose, onPet
         await db.settings.update(settings.id, { activePetId: newPetId });
       }
 
+      triggerDebouncedAutoSync();
       onPetAdded(newPetId);
       onClose();
       // Reset fields

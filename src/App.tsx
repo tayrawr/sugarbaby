@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { subDays, startOfDay, parseISO } from 'date-fns';
-import { db, initializeDatabase } from './db';
+import { db, initializeDatabase, recordTombstone } from './db';
 import type {
   Reading,
   Dose,
@@ -25,6 +25,9 @@ import { SettingsModal } from './components/modals/SettingsModal';
 import { FoodPresetManagerModal } from './components/modals/FoodPresetManagerModal';
 import { VetReportModal } from './components/modals/VetReportModal';
 import { AddPetModal } from './components/modals/AddPetModal';
+import { GoogleDriveSyncModal } from './components/modals/GoogleDriveSyncModal';
+import { synchronizeWithGoogleDrive, triggerDebouncedAutoSync } from './utils/syncEngine';
+import { getStoredToken } from './utils/googleDrive';
 
 export const App: React.FC = () => {
   const [isDbReady, setIsDbReady] = useState(false);
@@ -39,6 +42,7 @@ export const App: React.FC = () => {
   const [isPresetsOpen, setIsPresetsOpen] = useState(false);
   const [isVetReportOpen, setIsVetReportOpen] = useState(false);
   const [isAddPetOpen, setIsAddPetOpen] = useState(false);
+  const [isSyncOpen, setIsSyncOpen] = useState(false);
 
   // Editing state for existing records
   const [editingReading, setEditingReading] = useState<Reading | null>(null);
@@ -46,11 +50,39 @@ export const App: React.FC = () => {
   const [editingFeeding, setEditingFeeding] = useState<Feeding | null>(null);
   const [editingNote, setEditingNote] = useState<HealthNote | null>(null);
 
-  // Initialize DB
+  // Initialize DB and background sync
   useEffect(() => {
     initializeDatabase().then(() => {
       setIsDbReady(true);
+
+      // If user has active Google Drive connection, sync on startup
+      if (getStoredToken()?.access_token) {
+        synchronizeWithGoogleDrive().catch((err) => {
+          console.warn('Initial sync notice:', err);
+        });
+      }
     });
+
+    // Auto-sync when user returns to tab or network recovers
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && getStoredToken()?.access_token) {
+        synchronizeWithGoogleDrive().catch(() => {});
+      }
+    };
+
+    const handleOnline = () => {
+      if (getStoredToken()?.access_token) {
+        synchronizeWithGoogleDrive().catch(() => {});
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('online', handleOnline);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('online', handleOnline);
+    };
   }, []);
 
   // Live Queries from Dexie
@@ -167,6 +199,9 @@ export const App: React.FC = () => {
   const handleDeleteEvent = async (event: TimelineEvent) => {
     if (!window.confirm(`Are you sure you want to delete this ${event.type} entry?`)) return;
 
+    const entityType = event.type === 'note' ? 'healthNote' : event.type;
+    await recordTombstone(event.id, entityType);
+
     switch (event.type) {
       case 'reading':
         await db.readings.delete(event.id);
@@ -181,6 +216,8 @@ export const App: React.FC = () => {
         await db.healthNotes.delete(event.id);
         break;
     }
+
+    triggerDebouncedAutoSync();
   };
 
   if (!isDbReady || !pet || !settings) {
@@ -208,6 +245,7 @@ export const App: React.FC = () => {
         onOpenSettings={() => setIsSettingsOpen(true)}
         onOpenPresets={() => setIsPresetsOpen(true)}
         onOpenVetReport={() => setIsVetReportOpen(true)}
+        onOpenSync={() => setIsSyncOpen(true)}
       />
 
       {/* Main Content Area */}
@@ -323,6 +361,7 @@ export const App: React.FC = () => {
         settings={settings}
         onSelectPet={handleSelectPet}
         onAddNewPet={() => setIsAddPetOpen(true)}
+        onOpenSync={() => setIsSyncOpen(true)}
       />
 
       <AddPetModal
@@ -342,6 +381,11 @@ export const App: React.FC = () => {
         feedings={allFeedings}
         notes={allNotes}
         bgUnit={settings.bgUnit}
+      />
+
+      <GoogleDriveSyncModal
+        isOpen={isSyncOpen}
+        onClose={() => setIsSyncOpen(false)}
       />
     </div>
   );

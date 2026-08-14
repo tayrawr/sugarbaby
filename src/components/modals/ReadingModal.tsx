@@ -6,6 +6,7 @@ import { GlucoseNumpad } from '../common/GlucoseNumpad';
 import { getBgStatus, mmolLToMgDl, mgDlToMmolL } from '../../utils/units';
 import type { Reading, Pet, BgUnit } from '../../types';
 import { db } from '../../db';
+import { triggerDebouncedAutoSync } from '../../utils/syncEngine';
 
 interface ReadingModalProps {
   isOpen: boolean;
@@ -91,6 +92,7 @@ export const ReadingModal: React.FC<ReadingModalProps> = ({
         await db.readings.add(newReading);
       }
 
+      triggerDebouncedAutoSync();
       onSaved?.();
       onClose();
     } catch (err) {
