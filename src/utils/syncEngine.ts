@@ -12,6 +12,10 @@ import type {
 } from '../types';
 import {
   getStoredToken,
+  getStoredUserProfile,
+  isGoogleDriveLinked,
+  isTokenValid,
+  SessionExpiredError,
   getStoredFileId,
   setStoredFileId,
   getStoredFileLink,
@@ -31,17 +35,23 @@ import {
 type SyncStateListener = (state: GoogleDriveSyncState) => void;
 const listeners = new Set<SyncStateListener>();
 
+const initialIsLinked = isGoogleDriveLinked();
+const initialProfile = getStoredUserProfile();
+const initialToken = getStoredToken();
+const initialHasValidToken = isTokenValid(initialToken);
+
 let currentSyncState: GoogleDriveSyncState = {
-  isSignedIn: !!getStoredToken()?.access_token,
-  userEmail: getStoredToken()?.email || null,
-  userName: getStoredToken()?.name || null,
-  userAvatar: getStoredToken()?.picture || null,
+  isSignedIn: initialIsLinked,
+  isLinked: initialIsLinked,
+  userEmail: initialProfile?.email || initialToken?.email || null,
+  userName: initialProfile?.name || initialToken?.name || null,
+  userAvatar: initialProfile?.picture || initialToken?.picture || null,
   fileId: getStoredFileId(),
   fileName: 'SugarBaby_Household.json',
   webViewLink: getStoredFileLink(),
   lastSyncedAt: getLastSyncTime(),
-  status: 'idle',
-  errorMessage: null,
+  status: initialIsLinked ? (initialHasValidToken ? 'idle' : 'needs_reauth') : 'offline',
+  errorMessage: initialIsLinked && !initialHasValidToken ? 'Sync paused. Click Resume Sync to reconnect.' : null,
   isAutoSyncEnabled: isAutoSyncEnabled(),
 };
 
@@ -238,9 +248,12 @@ export async function writeHouseholdPayloadToLocalDb(payload: HouseholdDataPaylo
 }
 
 // Full Synchronize Execution
-export async function synchronizeWithGoogleDrive(forcePullOnly = false): Promise<boolean> {
-  const tokenData = getStoredToken();
-  if (!tokenData) {
+export async function synchronizeWithGoogleDrive(
+  forcePullOnly = false,
+  interactive = false
+): Promise<boolean> {
+  const isLinked = isGoogleDriveLinked();
+  if (!isLinked) {
     updateSyncState({ status: 'offline', errorMessage: 'Not signed in with Google.' });
     return false;
   }
@@ -252,8 +265,10 @@ export async function synchronizeWithGoogleDrive(forcePullOnly = false): Promise
   updateSyncState({ status: 'syncing', errorMessage: null });
 
   try {
-    const accessToken = await getValidAccessToken();
+    const accessToken = await getValidAccessToken(interactive);
     let fileId = getStoredFileId();
+
+    const profile = getStoredUserProfile() || getStoredToken();
 
     // Clean expired tombstones locally
     await purgeExpiredTombstones(60);
@@ -282,6 +297,11 @@ export async function synchronizeWithGoogleDrive(forcePullOnly = false): Promise
       setLastSyncTime(nowIso);
 
       updateSyncState({
+        isSignedIn: true,
+        isLinked: true,
+        userEmail: profile?.email || null,
+        userName: profile?.name || null,
+        userAvatar: profile?.picture || null,
         fileId,
         webViewLink: created.webViewLink || null,
         lastSyncedAt: nowIso,
@@ -330,6 +350,11 @@ export async function synchronizeWithGoogleDrive(forcePullOnly = false): Promise
     setLastSyncTime(nowIso);
 
     updateSyncState({
+      isSignedIn: true,
+      isLinked: true,
+      userEmail: profile?.email || null,
+      userName: profile?.name || null,
+      userAvatar: profile?.picture || null,
       lastSyncedAt: nowIso,
       status: 'synced',
       errorMessage: null,
@@ -337,6 +362,15 @@ export async function synchronizeWithGoogleDrive(forcePullOnly = false): Promise
 
     return true;
   } catch (err: any) {
+    if (err instanceof SessionExpiredError || err?.name === 'SessionExpiredError') {
+      console.info('Google Drive sync paused: session expired.');
+      updateSyncState({
+        status: 'needs_reauth',
+        errorMessage: 'Sync paused (session expired). Click Resume Sync to reconnect.',
+      });
+      return false;
+    }
+
     console.error('Sync failed:', err);
     updateSyncState({
       status: 'error',
@@ -346,14 +380,22 @@ export async function synchronizeWithGoogleDrive(forcePullOnly = false): Promise
   }
 }
 
+// 1-Click Interactive Re-authorization & Sync
+export async function resumeGoogleSync(): Promise<boolean> {
+  return synchronizeWithGoogleDrive(false, true);
+}
+
 // Connect to an explicitly provided file (by ID or URL, e.g. for family members)
-export async function connectToExistingSharedFile(input: string): Promise<boolean> {
+export async function connectToExistingSharedFile(
+  input: string,
+  interactive = true
+): Promise<boolean> {
   const fileId = extractFileIdFromInput(input);
   if (!fileId) {
     throw new Error('Please enter a valid Google Drive File ID or sharing link.');
   }
 
-  const accessToken = await getValidAccessToken();
+  const accessToken = await getValidAccessToken(interactive);
   updateSyncState({ status: 'syncing', errorMessage: null });
 
   try {
@@ -378,7 +420,14 @@ export async function connectToExistingSharedFile(input: string): Promise<boolea
     const nowIso = new Date().toISOString();
     setLastSyncTime(nowIso);
 
+    const profile = getStoredUserProfile() || getStoredToken();
+
     updateSyncState({
+      isSignedIn: true,
+      isLinked: true,
+      userEmail: profile?.email || null,
+      userName: profile?.name || null,
+      userAvatar: profile?.picture || null,
       fileId,
       fileName: metadata.name || 'SugarBaby_Household.json',
       webViewLink: metadata.webViewLink || null,
@@ -389,6 +438,14 @@ export async function connectToExistingSharedFile(input: string): Promise<boolea
 
     return true;
   } catch (err: any) {
+    if (err instanceof SessionExpiredError || err?.name === 'SessionExpiredError') {
+      updateSyncState({
+        status: 'needs_reauth',
+        errorMessage: 'Sync paused (session expired). Click Resume Sync to reconnect.',
+      });
+      throw err;
+    }
+
     updateSyncState({
       status: 'error',
       errorMessage: err.message || 'Failed to connect to shared file.',
@@ -401,7 +458,7 @@ export async function connectToExistingSharedFile(input: string): Promise<boolea
 let debouncedTimeout: any = null;
 
 export function triggerDebouncedAutoSync(delayMs = 2500): void {
-  if (!isAutoSyncEnabled() || !getStoredToken()) return;
+  if (!isAutoSyncEnabled() || !isGoogleDriveLinked()) return;
 
   if (debouncedTimeout) {
     clearTimeout(debouncedTimeout);
@@ -409,7 +466,7 @@ export function triggerDebouncedAutoSync(delayMs = 2500): void {
 
   debouncedTimeout = setTimeout(() => {
     synchronizeWithGoogleDrive().catch((err) => {
-      console.warn('Debounced sync error:', err);
+      console.warn('Debounced sync notice:', err);
     });
   }, delayMs);
 }

@@ -3,8 +3,17 @@ import type { HouseholdDataPayload } from '../types';
 export const GOOGLE_DRIVE_FILE_NAME = 'SugarBaby_Household.json';
 export const GOOGLE_SCOPES = 'https://www.googleapis.com/auth/drive email profile';
 
+export class SessionExpiredError extends Error {
+  constructor(message = 'Google Drive session expired. Please click Resume Sync.') {
+    super(message);
+    this.name = 'SessionExpiredError';
+  }
+}
+
 const STORAGE_KEYS = {
   TOKEN_DATA: 'sugarbaby_gdrive_token',
+  USER_PROFILE: 'sugarbaby_gdrive_profile',
+  IS_LINKED: 'sugarbaby_gdrive_linked',
   FILE_ID: 'sugarbaby_gdrive_file_id',
   FILE_LINK: 'sugarbaby_gdrive_file_link',
   CUSTOM_CLIENT_ID: 'sugarbaby_gdrive_custom_client_id',
@@ -36,12 +45,57 @@ export function setCustomClientId(clientId: string): void {
   }
 }
 
+export interface StoredUserProfile {
+  email: string;
+  name: string;
+  picture: string;
+}
+
 export interface StoredTokenData {
   access_token: string;
   expires_at: number; // Unix timestamp in ms
   email: string;
   name: string;
   picture: string;
+}
+
+export function getStoredUserProfile(): StoredUserProfile | null {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.USER_PROFILE);
+    if (raw) return JSON.parse(raw);
+    const tokenRaw = localStorage.getItem(STORAGE_KEYS.TOKEN_DATA);
+    if (tokenRaw) {
+      const data = JSON.parse(tokenRaw);
+      if (data.email || data.name) {
+        return {
+          email: data.email || '',
+          name: data.name || '',
+          picture: data.picture || '',
+        };
+      }
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveStoredUserProfile(profile: StoredUserProfile): void {
+  localStorage.setItem(STORAGE_KEYS.USER_PROFILE, JSON.stringify(profile));
+}
+
+export function isGoogleDriveLinked(): boolean {
+  const linked = localStorage.getItem(STORAGE_KEYS.IS_LINKED);
+  if (linked === 'true') return true;
+  return !!getStoredUserProfile() || !!getStoredToken()?.access_token;
+}
+
+export function setGoogleDriveLinked(linked: boolean): void {
+  if (linked) {
+    localStorage.setItem(STORAGE_KEYS.IS_LINKED, 'true');
+  } else {
+    localStorage.removeItem(STORAGE_KEYS.IS_LINKED);
+  }
 }
 
 export function getStoredToken(): StoredTokenData | null {
@@ -56,12 +110,32 @@ export function getStoredToken(): StoredTokenData | null {
   }
 }
 
+export function isTokenValid(tokenData: StoredTokenData | null): boolean {
+  return !!(tokenData && tokenData.access_token && tokenData.expires_at > Date.now() + 30000);
+}
+
 export function saveStoredToken(tokenData: StoredTokenData): void {
   localStorage.setItem(STORAGE_KEYS.TOKEN_DATA, JSON.stringify(tokenData));
+  if (tokenData.email || tokenData.name) {
+    saveStoredUserProfile({
+      email: tokenData.email,
+      name: tokenData.name,
+      picture: tokenData.picture,
+    });
+  }
+  setGoogleDriveLinked(true);
 }
 
 export function clearStoredToken(): void {
   localStorage.removeItem(STORAGE_KEYS.TOKEN_DATA);
+}
+
+export function disconnectGoogleDrive(): void {
+  localStorage.removeItem(STORAGE_KEYS.TOKEN_DATA);
+  localStorage.removeItem(STORAGE_KEYS.USER_PROFILE);
+  localStorage.removeItem(STORAGE_KEYS.IS_LINKED);
+  localStorage.removeItem(STORAGE_KEYS.FILE_ID);
+  localStorage.removeItem(STORAGE_KEYS.FILE_LINK);
   localStorage.removeItem(STORAGE_KEYS.LAST_SYNC_TIME);
 }
 
@@ -219,20 +293,27 @@ export async function requestGoogleAccessToken(promptUser = true): Promise<Store
   });
 }
 
-// Get valid access token (or refresh silently)
-export async function getValidAccessToken(): Promise<string> {
+// Get valid access token (or refresh silently / interactively)
+export async function getValidAccessToken(interactive = false): Promise<string> {
   const current = getStoredToken();
   if (current && current.access_token && current.expires_at > Date.now() + 30000) {
     return current.access_token;
   }
 
-  // Token expired or missing, attempt promptless token request
+  // If interactive (e.g. user clicked "Resume Sync" or "Sync Now"), trigger 1-click prompt
+  if (interactive) {
+    const refreshed = await requestGoogleAccessToken(true);
+    return refreshed.access_token;
+  }
+
+  // Token expired or missing, attempt silent promptless token request
   try {
     const refreshed = await requestGoogleAccessToken(false);
     return refreshed.access_token;
   } catch {
-    clearStoredToken();
-    throw new Error('Google Drive session expired. Please sign in again.');
+    // Session is expired and silent refresh failed (e.g. 3rd-party cookie partition).
+    // Do NOT wipe profile/file links! Throw SessionExpiredError so UI can transition to 'needs_reauth'.
+    throw new SessionExpiredError();
   }
 }
 

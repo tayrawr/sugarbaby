@@ -14,13 +14,14 @@ import {
   Users,
   ChevronDown,
   ChevronUp,
+  Zap,
 } from 'lucide-react';
 import { formatDistanceToNow, parseISO } from 'date-fns';
 import { ModalSheet } from '../common/ModalSheet';
 import type { GoogleDriveSyncState } from '../../types';
 import {
   requestGoogleAccessToken,
-  clearStoredToken,
+  disconnectGoogleDrive,
   getActiveClientId,
   setCustomClientId,
   setAutoSyncEnabled,
@@ -30,6 +31,7 @@ import {
   getSyncState,
   subscribeToSyncState,
   synchronizeWithGoogleDrive,
+  resumeGoogleSync,
   connectToExistingSharedFile,
   updateSyncState,
 } from '../../utils/syncEngine';
@@ -64,6 +66,7 @@ export const GoogleDriveSyncModal: React.FC<GoogleDriveSyncModalProps> = ({ isOp
       const tokenData = await requestGoogleAccessToken(true);
       updateSyncState({
         isSignedIn: true,
+        isLinked: true,
         userEmail: tokenData.email,
         userName: tokenData.name,
         userAvatar: tokenData.picture,
@@ -71,7 +74,7 @@ export const GoogleDriveSyncModal: React.FC<GoogleDriveSyncModalProps> = ({ isOp
         errorMessage: null,
       });
       // Immediately run sync cycle
-      await synchronizeWithGoogleDrive();
+      await synchronizeWithGoogleDrive(false, true);
     } catch (err: any) {
       console.error('Sign-in error:', err);
       setActionError(err.message || 'Google sign-in was cancelled or failed.');
@@ -80,12 +83,30 @@ export const GoogleDriveSyncModal: React.FC<GoogleDriveSyncModalProps> = ({ isOp
     }
   };
 
+  const handleResumeSyncAction = async () => {
+    setIsSigningIn(true);
+    setActionError(null);
+    try {
+      await resumeGoogleSync();
+    } catch (err: any) {
+      console.error('Resume sync error:', err);
+      setActionError(err.message || 'Failed to resume Google sync.');
+    } finally {
+      setIsSigningIn(false);
+    }
+  };
+
   const handleSignOut = () => {
-    if (window.confirm('Disconnect Google Drive sync? Your local data will remain intact.')) {
-      clearStoredToken();
+    if (
+      window.confirm(
+        'Disconnect Google Drive sync? Your local health logs will remain safe on this device.'
+      )
+    ) {
+      disconnectGoogleDrive();
       setStoredFileId(null);
       updateSyncState({
         isSignedIn: false,
+        isLinked: false,
         userEmail: null,
         userName: null,
         userAvatar: null,
@@ -99,7 +120,11 @@ export const GoogleDriveSyncModal: React.FC<GoogleDriveSyncModalProps> = ({ isOp
 
   const handleManualSync = async () => {
     setActionError(null);
-    await synchronizeWithGoogleDrive();
+    if (syncState.status === 'needs_reauth') {
+      await handleResumeSyncAction();
+    } else {
+      await synchronizeWithGoogleDrive();
+    }
   };
 
   const handleConnectSharedFile = async (e: React.FormEvent) => {
@@ -151,6 +176,12 @@ export const GoogleDriveSyncModal: React.FC<GoogleDriveSyncModalProps> = ({ isOp
             <CloudCheck className="w-3.5 h-3.5" /> Up to Date
           </span>
         );
+      case 'needs_reauth':
+        return (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/15 border border-amber-500/35 text-amber-300 text-xs font-semibold">
+            <Zap className="w-3.5 h-3.5 text-amber-400" /> Sync Paused
+          </span>
+        );
       case 'error':
         return (
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-semibold">
@@ -185,7 +216,7 @@ export const GoogleDriveSyncModal: React.FC<GoogleDriveSyncModalProps> = ({ isOp
     >
       <div className="space-y-5">
         {/* Error Banner */}
-        {(actionError || syncState.errorMessage) && (
+        {(actionError || (syncState.errorMessage && syncState.status === 'error')) && (
           <div className="p-3.5 rounded-2xl bg-rose-950/50 border border-rose-800/80 text-rose-300 text-xs flex items-start gap-2.5">
             <CloudAlert className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
             <div className="space-y-1">
@@ -195,8 +226,8 @@ export const GoogleDriveSyncModal: React.FC<GoogleDriveSyncModalProps> = ({ isOp
           </div>
         )}
 
-        {/* State 1: NOT SIGNED IN */}
-        {!syncState.isSignedIn ? (
+        {/* State 1: NOT SIGNED IN / NOT LINKED */}
+        {!syncState.isSignedIn && !syncState.isLinked ? (
           <div className="space-y-4">
             {/* Feature Pitch Card */}
             <div className="p-4 rounded-2xl bg-gradient-to-br from-indigo-950/40 via-slate-900 to-slate-900 border border-indigo-500/20 space-y-3">
@@ -268,7 +299,7 @@ export const GoogleDriveSyncModal: React.FC<GoogleDriveSyncModalProps> = ({ isOp
             </div>
           </div>
         ) : (
-          /* State 2: SIGNED IN */
+          /* State 2: LINKED / SIGNED IN */
           <div className="space-y-4">
             {/* Account Card */}
             <div className="p-3.5 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-between gap-3">
@@ -304,6 +335,40 @@ export const GoogleDriveSyncModal: React.FC<GoogleDriveSyncModalProps> = ({ isOp
                 <LogOut className="w-4 h-4" />
               </button>
             </div>
+
+            {/* Session Expired / Needs Reauth Alert Banner */}
+            {syncState.status === 'needs_reauth' && (
+              <div className="p-4 rounded-2xl bg-amber-950/40 border border-amber-500/40 text-amber-200 text-xs space-y-3">
+                <div className="flex items-start gap-2.5">
+                  <Zap className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                  <div>
+                    <div className="font-bold text-white">Google Session Expired</div>
+                    <div className="text-[11px] text-amber-200/90 leading-relaxed mt-0.5">
+                      Google requires security verification after 1 hour. Your health records remain completely safe on this device. Click below to resume cloud sync in 1 click.
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleResumeSyncAction}
+                  disabled={isSigningIn}
+                  className="w-full py-2.5 px-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-md shadow-amber-500/20 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {isSigningIn ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Re-authenticating...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Zap className="w-3.5 h-3.5 fill-slate-950" />
+                      <span>Resume Google Sync (1-Click)</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
 
             {/* Cloud Sync File Card */}
             <div className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-3">

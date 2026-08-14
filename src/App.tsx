@@ -27,7 +27,7 @@ import { VetReportModal } from './components/modals/VetReportModal';
 import { AddPetModal } from './components/modals/AddPetModal';
 import { GoogleDriveSyncModal } from './components/modals/GoogleDriveSyncModal';
 import { synchronizeWithGoogleDrive, triggerDebouncedAutoSync } from './utils/syncEngine';
-import { getStoredToken } from './utils/googleDrive';
+import { isGoogleDriveLinked } from './utils/googleDrive';
 
 export const App: React.FC = () => {
   const [isDbReady, setIsDbReady] = useState(false);
@@ -55,8 +55,8 @@ export const App: React.FC = () => {
     initializeDatabase().then(() => {
       setIsDbReady(true);
 
-      // If user has active Google Drive connection, sync on startup
-      if (getStoredToken()?.access_token) {
+      // If user has linked Google Drive, sync on startup
+      if (isGoogleDriveLinked()) {
         synchronizeWithGoogleDrive().catch((err) => {
           console.warn('Initial sync notice:', err);
         });
@@ -65,13 +65,13 @@ export const App: React.FC = () => {
 
     // Auto-sync when user returns to tab or network recovers
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && getStoredToken()?.access_token) {
+      if (document.visibilityState === 'visible' && isGoogleDriveLinked()) {
         synchronizeWithGoogleDrive().catch(() => {});
       }
     };
 
     const handleOnline = () => {
-      if (getStoredToken()?.access_token) {
+      if (isGoogleDriveLinked()) {
         synchronizeWithGoogleDrive().catch(() => {});
       }
     };

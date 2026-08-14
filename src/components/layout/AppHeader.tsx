@@ -7,11 +7,12 @@ import {
   CloudCheck,
   CloudAlert,
   RefreshCw,
+  Zap,
 } from 'lucide-react';
 import type { Pet, UserSettings, TimeWindow, GoogleDriveSyncState } from '../../types';
 import { TimeframeSelector } from '../dashboard/TimeframeSelector';
 import { PetSwitcher } from './PetSwitcher';
-import { getSyncState, subscribeToSyncState } from '../../utils/syncEngine';
+import { getSyncState, subscribeToSyncState, resumeGoogleSync } from '../../utils/syncEngine';
 
 interface AppHeaderProps {
   pet: Pet;
@@ -41,13 +42,29 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   onOpenSync,
 }) => {
   const [syncState, setSyncState] = useState<GoogleDriveSyncState>(getSyncState());
+  const [isResuming, setIsResuming] = useState(false);
 
   useEffect(() => {
     return subscribeToSyncState(setSyncState);
   }, []);
 
+  const handleResumeSync = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsResuming(true);
+    try {
+      const success = await resumeGoogleSync();
+      if (!success) {
+        onOpenSync();
+      }
+    } catch {
+      onOpenSync();
+    } finally {
+      setIsResuming(false);
+    }
+  };
+
   const renderSyncBadge = (isMobile = false) => {
-    if (!syncState.isSignedIn) {
+    if (!syncState.isSignedIn && !syncState.isLinked) {
       return (
         <button
           type="button"
@@ -59,6 +76,27 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
         >
           <Cloud className="w-3.5 h-3.5" />
           {!isMobile && <span>Local</span>}
+        </button>
+      );
+    }
+
+    if (syncState.status === 'needs_reauth') {
+      return (
+        <button
+          type="button"
+          onClick={handleResumeSync}
+          disabled={isResuming}
+          className={`${
+            isMobile ? 'p-2' : 'px-2.5 py-1.5'
+          } rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-300 hover:text-amber-200 text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm shadow-amber-500/10`}
+          title="Google session expired. Click to resume cloud sync in 1 click."
+        >
+          {isResuming ? (
+            <RefreshCw className="w-3.5 h-3.5 animate-spin text-amber-400" />
+          ) : (
+            <Zap className="w-3.5 h-3.5 text-amber-400 fill-amber-400/30" />
+          )}
+          {!isMobile && <span>{isResuming ? 'Connecting...' : 'Resume Sync'}</span>}
         </button>
       );
     }

@@ -130,7 +130,7 @@ export interface CycleGroup {
   maxBgMgDl?: number;
 }
 
-export type SyncStatus = 'idle' | 'syncing' | 'synced' | 'offline' | 'error';
+export type SyncStatus = 'idle' | 'syncing' | 'synced' | 'offline' | 'needs_reauth' | 'error';
 
 export interface Tombstone {
   id: string;
@@ -152,7 +152,8 @@ export interface HouseholdDataPayload {
 }
 
 export interface GoogleDriveSyncState {
-  isSignedIn: boolean;
+  isSignedIn: boolean; // Linked to a Google account
+  isLinked: boolean;   // Persistent linkage flag
   userEmail: string | null;
   userName: string | null;
   userAvatar: string | null;
