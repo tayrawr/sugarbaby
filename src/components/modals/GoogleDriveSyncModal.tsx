@@ -14,6 +14,7 @@ import {
   Users,
   ChevronDown,
   ChevronUp,
+  FolderSearch,
 } from 'lucide-react';
 import { formatDistanceToNow, parseISO } from 'date-fns';
 import { ModalSheet } from '../common/ModalSheet';
@@ -25,6 +26,8 @@ import {
   setCustomClientId,
   setAutoSyncEnabled,
   setStoredFileId,
+  getValidAccessToken,
+  openGoogleDriveFilePicker,
 } from '../../utils/googleDrive';
 import {
   getSyncState,
@@ -45,6 +48,7 @@ export const GoogleDriveSyncModal: React.FC<GoogleDriveSyncModalProps> = ({ isOp
   const [copiedLink, setCopiedLink] = useState(false);
   const [sharedFileInput, setSharedFileInput] = useState('');
   const [isConnectingFile, setIsConnectingFile] = useState(false);
+  const [isPickingFile, setIsPickingFile] = useState(false);
   const [customClientIdInput, setCustomClientIdInput] = useState(getActiveClientId());
   const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
   const [isSigningIn, setIsSigningIn] = useState(false);
@@ -116,6 +120,28 @@ export const GoogleDriveSyncModal: React.FC<GoogleDriveSyncModalProps> = ({ isOp
       setActionError(err.message || 'Failed to connect to shared file.');
     } finally {
       setIsConnectingFile(false);
+    }
+  };
+
+  const handleOpenPicker = async () => {
+    setIsPickingFile(true);
+    setActionError(null);
+    try {
+      const token = await getValidAccessToken();
+      const clientId = getActiveClientId();
+      const picked = await openGoogleDriveFilePicker(token, clientId);
+      if (picked && picked.id) {
+        await connectToExistingSharedFile(picked.id);
+        alert(`Successfully linked to shared file: ${picked.name}`);
+      }
+    } catch (err: any) {
+      console.error('Picker error:', err);
+      setActionError(
+        err.message ||
+          'Could not open Google Drive Picker. Please ensure Google Picker API is enabled in your Google Cloud project, or use the manual link below.'
+      );
+    } finally {
+      setIsPickingFile(false);
     }
   };
 
@@ -403,13 +429,27 @@ export const GoogleDriveSyncModal: React.FC<GoogleDriveSyncModalProps> = ({ isOp
                   <strong className="text-emerald-400">Editor</strong>.
                 </li>
                 <li>
-                  On their phone, have them open SugarBaby, click <strong>Sign in with Google</strong>, and it will automatically link!
+                  On their phone, have them sign into SugarBaby and tap{' '}
+                  <strong className="text-indigo-300">"Select Shared File from Google Drive"</strong> below to connect!
                 </li>
               </ol>
 
+              {/* Primary Action: Select Shared File via Google Picker */}
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={handleOpenPicker}
+                  disabled={isPickingFile}
+                  className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-bold text-xs shadow-md shadow-indigo-600/30 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  <FolderSearch className={`w-4 h-4 ${isPickingFile ? 'animate-spin' : ''}`} />
+                  <span>{isPickingFile ? 'Opening Google Picker...' : 'Select Shared File from Google Drive'}</span>
+                </button>
+              </div>
+
               {/* Copy Links Bar */}
               {syncState.fileId && (
-                <div className="pt-2 flex flex-wrap gap-2">
+                <div className="pt-1 flex flex-wrap gap-2">
                   <button
                     type="button"
                     onClick={() => handleCopy(syncState.fileId!, 'id')}
@@ -436,7 +476,7 @@ export const GoogleDriveSyncModal: React.FC<GoogleDriveSyncModalProps> = ({ isOp
             {/* Connect to Existing Shared File (Fallback) */}
             <form onSubmit={handleConnectSharedFile} className="p-3.5 rounded-2xl bg-slate-900 border border-slate-800 space-y-2">
               <label className="text-[11px] font-semibold text-slate-300">
-                Joining a Family Member's File? (Manual Link)
+                Or Link via File ID / Sharing URL
               </label>
               <div className="flex gap-2">
                 <input
