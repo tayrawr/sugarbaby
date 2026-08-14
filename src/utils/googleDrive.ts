@@ -1,7 +1,7 @@
 import type { HouseholdDataPayload } from '../types';
 
 export const GOOGLE_DRIVE_FILE_NAME = 'SugarBaby_Household.json';
-export const GOOGLE_SCOPES = 'https://www.googleapis.com/auth/drive.file email profile';
+export const GOOGLE_SCOPES = 'https://www.googleapis.com/auth/drive email profile';
 
 const STORAGE_KEYS = {
   TOKEN_DATA: 'sugarbaby_gdrive_token',
@@ -429,7 +429,7 @@ export async function getFileMetadataFromDrive(
 
     if (res.status === 404) {
       throw new Error(
-        `Google Drive file (${fileId}) was not found or has not been authorized. Use 'Select Shared File from Google Drive' to link it.`
+        `Google Drive file (${fileId}) was not found. Please verify the File ID or sharing permissions in Google Drive.`
       );
     }
     throw new Error(`Failed to get file info from Google Drive (${res.status}): ${detail}`);
@@ -459,109 +459,4 @@ export function extractFileIdFromInput(input: string): string {
   return clean;
 }
 
-// Google Drive Picker API Integration
-let gapiLoadingPromise: Promise<void> | null = null;
-
-export function loadGapiPickerScript(): Promise<void> {
-  if ((window as any).google?.picker) {
-    return Promise.resolve();
-  }
-
-  if (gapiLoadingPromise) {
-    return gapiLoadingPromise;
-  }
-
-  gapiLoadingPromise = new Promise((resolve, reject) => {
-    const existing = document.getElementById('google-api-client');
-    const onScriptLoaded = () => {
-      if ((window as any).gapi) {
-        (window as any).gapi.load('picker', {
-          callback: () => resolve(),
-          onerror: (err: any) => reject(new Error(`Failed to load Google Picker: ${err}`)),
-        });
-      } else {
-        reject(new Error('Google API client failed to initialize.'));
-      }
-    };
-
-    if (existing) {
-      if ((window as any).gapi) {
-        onScriptLoaded();
-      } else {
-        existing.addEventListener('load', onScriptLoaded);
-        existing.addEventListener('error', (e) => reject(e));
-      }
-      return;
-    }
-
-    const script = document.createElement('script');
-    script.id = 'google-api-client';
-    script.src = 'https://apis.google.com/js/api.js';
-    script.async = true;
-    script.defer = true;
-    script.onload = onScriptLoaded;
-    script.onerror = (err) => {
-      gapiLoadingPromise = null;
-      reject(new Error(`Failed to load Google API script: ${err}`));
-    };
-    document.head.appendChild(script);
-  });
-
-  return gapiLoadingPromise;
-}
-
-export async function openGoogleDriveFilePicker(
-  accessToken: string,
-  clientId: string
-): Promise<{ id: string; name: string } | null> {
-  await loadGapiPickerScript();
-
-  const google = (window as any).google;
-  if (!google?.picker) {
-    throw new Error('Google Picker library is not available.');
-  }
-
-  const appId = clientId.split('-')[0];
-
-  return new Promise((resolve, reject) => {
-    try {
-      const docsView = new google.picker.DocsView(google.picker.ViewId.DOCS)
-        .setIncludeFolders(true)
-        .setSelectFolderEnabled(false);
-
-      const sharedView = new google.picker.DocsView(google.picker.ViewId.DOCS)
-        .setIncludeFolders(true)
-        .setSelectFolderEnabled(false)
-        .setOwnedByMe(false);
-
-      const pickerBuilder = new google.picker.PickerBuilder()
-        .enableFeature(google.picker.Feature.NAV_HIDDEN)
-        .setAppId(appId)
-        .setOAuthToken(accessToken)
-        .addView(docsView)
-        .addView(sharedView)
-        .setTitle('Select Shared SugarBaby Household File')
-        .setCallback((data: any) => {
-          if (data.action === google.picker.Action.PICKED) {
-            const doc = data.docs?.[0];
-            if (doc && doc.id) {
-              resolve({
-                id: doc.id,
-                name: doc.name || GOOGLE_DRIVE_FILE_NAME,
-              });
-            } else {
-              resolve(null);
-            }
-          } else if (data.action === google.picker.Action.CANCEL) {
-            resolve(null);
-          }
-        });
-
-      const picker = pickerBuilder.build();
-      picker.setVisible(true);
-    } catch (err: any) {
-      reject(new Error(`Failed to open Google Drive Picker: ${err.message || err}`));
-    }
-  });
-}
 
