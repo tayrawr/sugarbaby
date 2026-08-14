@@ -241,24 +241,46 @@ export async function findHouseholdFileOnDrive(
   accessToken: string
 ): Promise<{ id: string; name: string; webViewLink?: string } | null> {
   const query = encodeURIComponent(`name = '${GOOGLE_DRIVE_FILE_NAME}' and trashed = false`);
-  const url = `https://www.googleapis.com/drive/v3/files?q=${query}&fields=files(id,name,webViewLink,modifiedTime,owners)&spaces=drive`;
+  const url = `https://www.googleapis.com/drive/v3/files?q=${query}&fields=files(id,name,webViewLink,modifiedTime,owners,sharedWithMe)&orderBy=modifiedTime desc&includeItemsFromAllDrives=true&supportsAllDrives=true&corpora=allDrives`;
 
-  const res = await fetch(url, {
+  try {
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      if (data.files && data.files.length > 0) {
+        // If there's a file shared with the user, prioritize it over newly created local ones
+        const sharedFile = data.files.find((f: any) => f.sharedWithMe);
+        const file = sharedFile || data.files[0];
+        return {
+          id: file.id,
+          name: file.name,
+          webViewLink: file.webViewLink,
+        };
+      }
+    }
+  } catch (err) {
+    console.warn('Advanced drive search fallback:', err);
+  }
+
+  // Fallback to basic search if corpora=allDrives is not supported for account
+  const fallbackUrl = `https://www.googleapis.com/drive/v3/files?q=${query}&fields=files(id,name,webViewLink,modifiedTime,owners)&spaces=drive`;
+  const fallbackRes = await fetch(fallbackUrl, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
 
-  if (!res.ok) {
-    throw new Error(`Failed to search Google Drive: ${res.statusText}`);
-  }
-
-  const data = await res.json();
-  if (data.files && data.files.length > 0) {
-    const file = data.files[0];
-    return {
-      id: file.id,
-      name: file.name,
-      webViewLink: file.webViewLink,
-    };
+  if (fallbackRes.ok) {
+    const data = await fallbackRes.json();
+    if (data.files && data.files.length > 0) {
+      const file = data.files[0];
+      return {
+        id: file.id,
+        name: file.name,
+        webViewLink: file.webViewLink,
+      };
+    }
   }
 
   return null;

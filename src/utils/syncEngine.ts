@@ -101,13 +101,31 @@ export function isDefaultSampleData(payload: HouseholdDataPayload): boolean {
   if (payload.pets.length !== 1) return false;
   const onlyPet = payload.pets[0];
   if (onlyPet.id !== 'pet_default_milo') return false;
+  if (onlyPet.name !== 'Milo') return false;
+  if (onlyPet.targetMinMgDl !== 80 || onlyPet.targetMaxMgDl !== 150) return false;
+  if (onlyPet.defaultDoseUnits !== 1.5) return false;
+  if (onlyPet.scheduledAmTime !== '08:00' || onlyPet.scheduledPmTime !== '20:00') return false;
 
   // If readings are all sample reading IDs (starting with reading_am_ or reading_pm_)
   const nonSampleReadings = payload.readings.filter(
     (r) => !r.id.startsWith('reading_am_') && !r.id.startsWith('reading_pm_')
   );
+  if (nonSampleReadings.length > 0) return false;
 
-  return nonSampleReadings.length === 0;
+  const nonSampleDoses = payload.doses.filter(
+    (d) => !d.id.startsWith('dose_am_') && !d.id.startsWith('dose_pm_')
+  );
+  if (nonSampleDoses.length > 0) return false;
+
+  const nonSampleFeedings = payload.feedings.filter(
+    (f) => !f.id.startsWith('feed_am_') && !f.id.startsWith('feed_pm_')
+  );
+  if (nonSampleFeedings.length > 0) return false;
+
+  const nonSampleNotes = payload.healthNotes.filter((n) => n.id !== 'note_sample_1');
+  if (nonSampleNotes.length > 0) return false;
+
+  return true;
 }
 
 // Reconcile and merge local and remote payloads intelligently

@@ -5,6 +5,7 @@ import type { Pet, UserSettings, BgUnit } from '../../types';
 import { db, initializeDatabase, recordTombstone } from '../../db';
 import { exportToCsv, exportCompleteBackupJson, restoreCompleteBackupJson, downloadFile } from '../../utils/export';
 import { triggerDebouncedAutoSync } from '../../utils/syncEngine';
+import { clearStoredToken, setStoredFileId } from '../../utils/googleDrive';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -159,7 +160,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   const handleResetSampleData = async () => {
-    if (window.confirm('Reset database to clean initial sample data? Current data will be replaced.')) {
+    if (
+      window.confirm(
+        'Reset local database to clean initial sample data? This will also disconnect cloud sync so you start completely fresh.'
+      )
+    ) {
+      clearStoredToken();
+      setStoredFileId(null);
       await db.delete();
       await db.open();
       await initializeDatabase();
