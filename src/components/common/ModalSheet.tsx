@@ -41,16 +41,20 @@ export const ModalSheet: React.FC<ModalSheetProps> = ({
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-slate-950/75 backdrop-blur-sm transition-opacity animate-fadeIn"
+        className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm transition-opacity animate-fadeIn"
         onClick={onClose}
       />
 
       {/* Modal / Bottom Sheet Box */}
       <div
-        className={`relative w-full ${maxWidth} bg-slate-900 border border-slate-700/80 rounded-t-3xl sm:rounded-3xl shadow-2xl shadow-black/80 max-h-[92vh] flex flex-col overflow-hidden z-10 transition-transform animate-slideUp sm:animate-scaleUp`}
+        className={`relative w-full ${maxWidth} bg-slate-900 border border-slate-700/80 rounded-t-3xl sm:rounded-3xl shadow-2xl shadow-black/90 max-h-[90dvh] sm:max-h-[92vh] flex flex-col overflow-hidden z-10 transition-transform animate-slideUp sm:animate-scaleUp`}
       >
         {/* Mobile Pull Bar */}
-        <div className="w-12 h-1.5 bg-slate-700 rounded-full mx-auto mt-2.5 sm:hidden shrink-0" />
+        <div 
+          className="w-12 h-1.5 bg-slate-700 hover:bg-slate-600 rounded-full mx-auto mt-2.5 sm:hidden shrink-0 cursor-grab active:cursor-grabbing"
+          onClick={onClose}
+          title="Tap or drag to close"
+        />
 
         {/* Modal Header */}
         <div className="flex items-center justify-between px-5 pt-3 pb-3 border-b border-slate-800/80 shrink-0">
@@ -65,13 +69,14 @@ export const ModalSheet: React.FC<ModalSheetProps> = ({
             type="button"
             onClick={onClose}
             className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+            aria-label="Close modal"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Modal Scrollable Content */}
-        <div className="p-4 sm:p-5 overflow-y-auto space-y-4">
+        <div className="p-4 sm:p-5 overflow-y-auto overscroll-contain space-y-4 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
           {children}
         </div>
       </div>

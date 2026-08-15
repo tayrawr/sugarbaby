@@ -8,6 +8,19 @@ interface BottomDockProps {
   onOpenNote: () => void;
 }
 
+/**
+ * Triggers light tactile vibration feedback on supported mobile devices.
+ */
+function triggerHaptic(duration = 10): void {
+  try {
+    if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+      navigator.vibrate(duration);
+    }
+  } catch {
+    // Ignore unsupported devices / permissions
+  }
+}
+
 export const BottomDock: React.FC<BottomDockProps> = ({
   onOpenReading,
   onOpenDose,
@@ -15,13 +28,16 @@ export const BottomDock: React.FC<BottomDockProps> = ({
   onOpenNote,
 }) => {
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-40 bg-slate-950/85 backdrop-blur-xl border-t border-slate-800/80 px-3 sm:px-6 py-2.5 pb-[max(0.65rem,env(safe-area-inset-bottom))]">
+    <div className="fixed bottom-0 left-0 right-0 z-40 bg-slate-950/85 backdrop-blur-xl border-t border-slate-800/80 px-3 sm:px-6 py-2.5 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
       <div className="max-w-xl mx-auto grid grid-cols-4 gap-2">
         {/* + Reading */}
         <button
           type="button"
-          onClick={onOpenReading}
-          className="py-2 sm:py-2.5 px-1 rounded-2xl bg-rose-500/15 hover:bg-rose-500/25 active:bg-rose-500/35 active:scale-95 border border-rose-500/30 text-rose-300 transition-all flex flex-col items-center justify-center gap-1 shadow-sm"
+          onClick={() => {
+            triggerHaptic(12);
+            onOpenReading();
+          }}
+          className="py-2 sm:py-2.5 px-1 rounded-2xl bg-rose-500/15 hover:bg-rose-500/25 active:bg-rose-500/35 active:scale-95 border border-rose-500/30 text-rose-300 transition-all flex flex-col items-center justify-center gap-1 shadow-sm select-none"
         >
           <Activity className="w-5 h-5 text-rose-400" />
           <span className="text-[11px] sm:text-xs font-bold leading-none">+ Reading</span>
@@ -30,8 +46,11 @@ export const BottomDock: React.FC<BottomDockProps> = ({
         {/* + Dose */}
         <button
           type="button"
-          onClick={onOpenDose}
-          className="py-2 sm:py-2.5 px-1 rounded-2xl bg-indigo-500/15 hover:bg-indigo-500/25 active:bg-indigo-500/35 active:scale-95 border border-indigo-500/30 text-indigo-300 transition-all flex flex-col items-center justify-center gap-1 shadow-sm"
+          onClick={() => {
+            triggerHaptic(12);
+            onOpenDose();
+          }}
+          className="py-2 sm:py-2.5 px-1 rounded-2xl bg-indigo-500/15 hover:bg-indigo-500/25 active:bg-indigo-500/35 active:scale-95 border border-indigo-500/30 text-indigo-300 transition-all flex flex-col items-center justify-center gap-1 shadow-sm select-none"
         >
           <Syringe className="w-5 h-5 text-indigo-400" />
           <span className="text-[11px] sm:text-xs font-bold leading-none">+ Dose</span>
@@ -40,8 +59,11 @@ export const BottomDock: React.FC<BottomDockProps> = ({
         {/* + Feeding */}
         <button
           type="button"
-          onClick={onOpenFeeding}
-          className="py-2 sm:py-2.5 px-1 rounded-2xl bg-amber-500/15 hover:bg-amber-500/25 active:bg-amber-500/35 active:scale-95 border border-amber-500/30 text-amber-300 transition-all flex flex-col items-center justify-center gap-1 shadow-sm"
+          onClick={() => {
+            triggerHaptic(12);
+            onOpenFeeding();
+          }}
+          className="py-2 sm:py-2.5 px-1 rounded-2xl bg-amber-500/15 hover:bg-amber-500/25 active:bg-amber-500/35 active:scale-95 border border-amber-500/30 text-amber-300 transition-all flex flex-col items-center justify-center gap-1 shadow-sm select-none"
         >
           <Utensils className="w-5 h-5 text-amber-400" />
           <span className="text-[11px] sm:text-xs font-bold leading-none">+ Food</span>
@@ -50,8 +72,11 @@ export const BottomDock: React.FC<BottomDockProps> = ({
         {/* + Note */}
         <button
           type="button"
-          onClick={onOpenNote}
-          className="py-2 sm:py-2.5 px-1 rounded-2xl bg-teal-500/15 hover:bg-teal-500/25 active:bg-teal-500/35 active:scale-95 border border-teal-500/30 text-teal-300 transition-all flex flex-col items-center justify-center gap-1 shadow-sm"
+          onClick={() => {
+            triggerHaptic(12);
+            onOpenNote();
+          }}
+          className="py-2 sm:py-2.5 px-1 rounded-2xl bg-teal-500/15 hover:bg-teal-500/25 active:bg-teal-500/35 active:scale-95 border border-teal-500/30 text-teal-300 transition-all flex flex-col items-center justify-center gap-1 shadow-sm select-none"
         >
           <FileText className="w-5 h-5 text-teal-400" />
           <span className="text-[11px] sm:text-xs font-bold leading-none">+ Note</span>
