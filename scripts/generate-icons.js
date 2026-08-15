@@ -1,0 +1,184 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { Resvg } from '@resvg/resvg-js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const publicDir = path.resolve(__dirname, '../public');
+
+// Standard icon SVG (512x512)
+const standardSvg = `
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="50%" stop-color="#020617"/>
+      <stop offset="100%" stop-color="#020617"/>
+    </linearGradient>
+    <radialGradient id="glowGrad" cx="50%" cy="45%" r="45%">
+      <stop offset="0%" stop-color="#6366f1" stop-opacity="0.35"/>
+      <stop offset="60%" stop-color="#f43f5e" stop-opacity="0.15"/>
+      <stop offset="100%" stop-color="#020617" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="dropGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fb7185"/>
+      <stop offset="40%" stop-color="#f43f5e"/>
+      <stop offset="100%" stop-color="#e11d48"/>
+    </linearGradient>
+    <linearGradient id="catGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#e0e7ff"/>
+      <stop offset="100%" stop-color="#818cf8"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="125%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#f43f5e" flood-opacity="0.4"/>
+    </filter>
+    <filter id="catGlow" x="-10%" y="-10%" width="120%" height="125%">
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#6366f1" flood-opacity="0.5"/>
+    </filter>
+  </defs>
+
+  <!-- Background container -->
+  <rect width="512" height="512" rx="112" fill="url(#bgGrad)"/>
+  <rect width="512" height="512" rx="112" fill="url(#glowGrad)"/>
+  
+  <!-- Subtle border highlight -->
+  <rect x="2" y="2" width="508" height="508" rx="110" fill="none" stroke="#334155" stroke-width="3" stroke-opacity="0.5"/>
+
+  <g transform="translate(0, 8)">
+    <!-- Cat Ears & Head Silhouette -->
+    <path d="M 136 210 L 176 100 Q 200 135 256 135 Q 312 135 336 100 L 376 210 Q 400 290 368 360 Q 336 415 256 415 Q 176 415 144 360 Q 112 290 136 210 Z" 
+          fill="none" 
+          stroke="url(#catGrad)" 
+          stroke-width="14" 
+          stroke-linejoin="round"
+          stroke-linecap="round"
+          filter="url(#catGlow)"/>
+
+    <!-- Left Ear Inner Accent -->
+    <path d="M 175 140 L 195 190" stroke="#818cf8" stroke-width="8" stroke-linecap="round" opacity="0.6"/>
+    <!-- Right Ear Inner Accent -->
+    <path d="M 337 140 L 317 190" stroke="#818cf8" stroke-width="8" stroke-linecap="round" opacity="0.6"/>
+
+    <!-- Central Glowing Blood Glucose Drop -->
+    <g filter="url(#shadow)">
+      <path d="M 256 195 C 256 195 196 270 196 315 C 196 348 223 375 256 375 C 289 375 316 348 316 315 C 316 270 256 195 256 195 Z" 
+            fill="url(#dropGrad)"/>
+    </g>
+
+    <!-- Glucose Drop Inner Highlight -->
+    <ellipse cx="238" cy="295" rx="12" ry="24" transform="rotate(-25 238 295)" fill="#ffffff" opacity="0.45"/>
+    <circle cx="270" cy="335" r="5" fill="#ffffff" opacity="0.3"/>
+
+    <!-- Cat Whiskers -->
+    <path d="M 130 310 L 175 315" stroke="#94a3b8" stroke-width="5" stroke-linecap="round" opacity="0.6"/>
+    <path d="M 125 335 L 175 332" stroke="#94a3b8" stroke-width="5" stroke-linecap="round" opacity="0.6"/>
+    <path d="M 382 310 L 337 315" stroke="#94a3b8" stroke-width="5" stroke-linecap="round" opacity="0.6"/>
+    <path d="M 387 335 L 337 332" stroke="#94a3b8" stroke-width="5" stroke-linecap="round" opacity="0.6"/>
+
+    <!-- Sparkle / Star of Health -->
+    <path d="M 365 180 Q 375 180 375 170 Q 375 180 385 180 Q 375 180 375 190 Q 375 180 365 180 Z" fill="#38bdf8"/>
+    <circle cx="375" cy="180" r="1.5" fill="#ffffff"/>
+  </g>
+</svg>
+`;
+
+// Maskable icon SVG (512x512 with safe zone padding: content fits within central 400x400)
+const maskableSvg = `
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgGradM" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="50%" stop-color="#020617"/>
+      <stop offset="100%" stop-color="#020617"/>
+    </linearGradient>
+    <radialGradient id="glowGradM" cx="50%" cy="50%" r="45%">
+      <stop offset="0%" stop-color="#6366f1" stop-opacity="0.4"/>
+      <stop offset="60%" stop-color="#f43f5e" stop-opacity="0.15"/>
+      <stop offset="100%" stop-color="#020617" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="dropGradM" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fb7185"/>
+      <stop offset="40%" stop-color="#f43f5e"/>
+      <stop offset="100%" stop-color="#e11d48"/>
+    </linearGradient>
+    <linearGradient id="catGradM" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#e0e7ff"/>
+      <stop offset="100%" stop-color="#818cf8"/>
+    </linearGradient>
+    <filter id="shadowM" x="-10%" y="-10%" width="120%" height="125%">
+      <feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#f43f5e" flood-opacity="0.4"/>
+    </filter>
+  </defs>
+
+  <!-- Full bleed background for maskable icon -->
+  <rect width="512" height="512" fill="url(#bgGradM)"/>
+  <rect width="512" height="512" fill="url(#glowGradM)"/>
+
+  <!-- Scaled content centered inside 80% safe zone -->
+  <g transform="translate(256, 256) scale(0.72) translate(-256, -256)">
+    <!-- Cat Ears & Head Silhouette -->
+    <path d="M 136 210 L 176 100 Q 200 135 256 135 Q 312 135 336 100 L 376 210 Q 400 290 368 360 Q 336 415 256 415 Q 176 415 144 360 Q 112 290 136 210 Z" 
+          fill="none" 
+          stroke="url(#catGradM)" 
+          stroke-width="16" 
+          stroke-linejoin="round"
+          stroke-linecap="round"/>
+
+    <!-- Left Ear Inner Accent -->
+    <path d="M 175 140 L 195 190" stroke="#818cf8" stroke-width="10" stroke-linecap="round" opacity="0.6"/>
+    <!-- Right Ear Inner Accent -->
+    <path d="M 337 140 L 317 190" stroke="#818cf8" stroke-width="10" stroke-linecap="round" opacity="0.6"/>
+
+    <!-- Central Glowing Blood Glucose Drop -->
+    <g filter="url(#shadowM)">
+      <path d="M 256 195 C 256 195 196 270 196 315 C 196 348 223 375 256 375 C 289 375 316 348 316 315 C 316 270 256 195 256 195 Z" 
+            fill="url(#dropGradM)"/>
+    </g>
+
+    <!-- Glucose Drop Inner Highlight -->
+    <ellipse cx="238" cy="295" rx="12" ry="24" transform="rotate(-25 238 295)" fill="#ffffff" opacity="0.45"/>
+    <circle cx="270" cy="335" r="5" fill="#ffffff" opacity="0.3"/>
+
+    <!-- Cat Whiskers -->
+    <path d="M 130 310 L 175 315" stroke="#94a3b8" stroke-width="6" stroke-linecap="round" opacity="0.6"/>
+    <path d="M 125 335 L 175 332" stroke="#94a3b8" stroke-width="6" stroke-linecap="round" opacity="0.6"/>
+    <path d="M 382 310 L 337 315" stroke="#94a3b8" stroke-width="6" stroke-linecap="round" opacity="0.6"/>
+    <path d="M 387 335 L 337 332" stroke="#94a3b8" stroke-width="6" stroke-linecap="round" opacity="0.6"/>
+
+    <!-- Sparkle / Star of Health -->
+    <path d="M 365 180 Q 375 180 375 170 Q 375 180 385 180 Q 375 180 375 190 Q 375 180 365 180 Z" fill="#38bdf8"/>
+  </g>
+</svg>
+`;
+
+function renderAndSavePng(svgString, width, height, outputPath) {
+  const resvg = new Resvg(svgString, {
+    fitTo: {
+      mode: 'width',
+      value: width,
+    },
+  });
+  const pngData = resvg.render();
+  const pngBuffer = pngData.asPng();
+  fs.writeFileSync(outputPath, pngBuffer);
+  console.log(`Saved: ${outputPath} (${width}x${height})`);
+}
+
+// 1. Save standard favicon.svg
+fs.writeFileSync(path.join(publicDir, 'favicon.svg'), standardSvg.trim());
+console.log('Saved: favicon.svg');
+
+// 2. Render pwa-192x192.png
+renderAndSavePng(standardSvg, 192, 192, path.join(publicDir, 'pwa-192x192.png'));
+
+// 3. Render pwa-512x512.png
+renderAndSavePng(standardSvg, 512, 512, path.join(publicDir, 'pwa-512x512.png'));
+
+// 4. Render maskable-icon-512x512.png
+renderAndSavePng(maskableSvg, 512, 512, path.join(publicDir, 'maskable-icon-512x512.png'));
+
+// 5. Render apple-touch-icon.png (180x180)
+renderAndSavePng(standardSvg, 180, 180, path.join(publicDir, 'apple-touch-icon.png'));
+
+console.log('All PWA icons generated successfully!');
