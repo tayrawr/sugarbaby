@@ -21,12 +21,39 @@ const STORAGE_KEYS = {
   AUTO_SYNC: 'sugarbaby_gdrive_auto_sync',
 };
 
+function safeGetItem(key: string): string | null {
+  if (typeof localStorage === 'undefined') return null;
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function safeSetItem(key: string, value: string): void {
+  if (typeof localStorage === 'undefined') return;
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // Ignore storage write errors (e.g. quota, private browsing)
+  }
+}
+
+function safeRemoveItem(key: string): void {
+  if (typeof localStorage === 'undefined') return;
+  try {
+    localStorage.removeItem(key);
+  } catch {
+    // Ignore storage errors
+  }
+}
+
 export const DEFAULT_GOOGLE_CLIENT_ID =
   '42613205860-kjulbdb20vf9604o8tuoi82p2udf2pbv.apps.googleusercontent.com';
 
 // Fallback / standard client ID or environment variable
 export function getActiveClientId(): string {
-  const custom = localStorage.getItem(STORAGE_KEYS.CUSTOM_CLIENT_ID);
+  const custom = safeGetItem(STORAGE_KEYS.CUSTOM_CLIENT_ID);
   if (custom && custom.trim()) {
     return custom.trim();
   }
@@ -39,9 +66,9 @@ export function getActiveClientId(): string {
 
 export function setCustomClientId(clientId: string): void {
   if (clientId && clientId.trim()) {
-    localStorage.setItem(STORAGE_KEYS.CUSTOM_CLIENT_ID, clientId.trim());
+    safeSetItem(STORAGE_KEYS.CUSTOM_CLIENT_ID, clientId.trim());
   } else {
-    localStorage.removeItem(STORAGE_KEYS.CUSTOM_CLIENT_ID);
+    safeRemoveItem(STORAGE_KEYS.CUSTOM_CLIENT_ID);
   }
 }
 
@@ -61,9 +88,9 @@ export interface StoredTokenData {
 
 export function getStoredUserProfile(): StoredUserProfile | null {
   try {
-    const raw = localStorage.getItem(STORAGE_KEYS.USER_PROFILE);
+    const raw = safeGetItem(STORAGE_KEYS.USER_PROFILE);
     if (raw) return JSON.parse(raw);
-    const tokenRaw = localStorage.getItem(STORAGE_KEYS.TOKEN_DATA);
+    const tokenRaw = safeGetItem(STORAGE_KEYS.TOKEN_DATA);
     if (tokenRaw) {
       const data = JSON.parse(tokenRaw);
       if (data.email || data.name) {
@@ -81,26 +108,26 @@ export function getStoredUserProfile(): StoredUserProfile | null {
 }
 
 export function saveStoredUserProfile(profile: StoredUserProfile): void {
-  localStorage.setItem(STORAGE_KEYS.USER_PROFILE, JSON.stringify(profile));
+  safeSetItem(STORAGE_KEYS.USER_PROFILE, JSON.stringify(profile));
 }
 
 export function isGoogleDriveLinked(): boolean {
-  const linked = localStorage.getItem(STORAGE_KEYS.IS_LINKED);
+  const linked = safeGetItem(STORAGE_KEYS.IS_LINKED);
   if (linked === 'true') return true;
   return !!getStoredUserProfile() || !!getStoredToken()?.access_token;
 }
 
 export function setGoogleDriveLinked(linked: boolean): void {
   if (linked) {
-    localStorage.setItem(STORAGE_KEYS.IS_LINKED, 'true');
+    safeSetItem(STORAGE_KEYS.IS_LINKED, 'true');
   } else {
-    localStorage.removeItem(STORAGE_KEYS.IS_LINKED);
+    safeRemoveItem(STORAGE_KEYS.IS_LINKED);
   }
 }
 
 export function getStoredToken(): StoredTokenData | null {
   try {
-    const raw = localStorage.getItem(STORAGE_KEYS.TOKEN_DATA);
+    const raw = safeGetItem(STORAGE_KEYS.TOKEN_DATA);
     if (!raw) return null;
     const data: StoredTokenData = JSON.parse(raw);
     if (!data.access_token) return null;
@@ -115,7 +142,7 @@ export function isTokenValid(tokenData: StoredTokenData | null): boolean {
 }
 
 export function saveStoredToken(tokenData: StoredTokenData): void {
-  localStorage.setItem(STORAGE_KEYS.TOKEN_DATA, JSON.stringify(tokenData));
+  safeSetItem(STORAGE_KEYS.TOKEN_DATA, JSON.stringify(tokenData));
   if (tokenData.email || tokenData.name) {
     saveStoredUserProfile({
       email: tokenData.email,
@@ -127,58 +154,58 @@ export function saveStoredToken(tokenData: StoredTokenData): void {
 }
 
 export function clearStoredToken(): void {
-  localStorage.removeItem(STORAGE_KEYS.TOKEN_DATA);
+  safeRemoveItem(STORAGE_KEYS.TOKEN_DATA);
 }
 
 export function disconnectGoogleDrive(): void {
-  localStorage.removeItem(STORAGE_KEYS.TOKEN_DATA);
-  localStorage.removeItem(STORAGE_KEYS.USER_PROFILE);
-  localStorage.removeItem(STORAGE_KEYS.IS_LINKED);
-  localStorage.removeItem(STORAGE_KEYS.FILE_ID);
-  localStorage.removeItem(STORAGE_KEYS.FILE_LINK);
-  localStorage.removeItem(STORAGE_KEYS.LAST_SYNC_TIME);
+  safeRemoveItem(STORAGE_KEYS.TOKEN_DATA);
+  safeRemoveItem(STORAGE_KEYS.USER_PROFILE);
+  safeRemoveItem(STORAGE_KEYS.IS_LINKED);
+  safeRemoveItem(STORAGE_KEYS.FILE_ID);
+  safeRemoveItem(STORAGE_KEYS.FILE_LINK);
+  safeRemoveItem(STORAGE_KEYS.LAST_SYNC_TIME);
 }
 
 export function getStoredFileId(): string | null {
-  return localStorage.getItem(STORAGE_KEYS.FILE_ID);
+  return safeGetItem(STORAGE_KEYS.FILE_ID);
 }
 
 export function setStoredFileId(fileId: string | null): void {
   if (fileId) {
-    localStorage.setItem(STORAGE_KEYS.FILE_ID, fileId);
+    safeSetItem(STORAGE_KEYS.FILE_ID, fileId);
   } else {
-    localStorage.removeItem(STORAGE_KEYS.FILE_ID);
-    localStorage.removeItem(STORAGE_KEYS.FILE_LINK);
+    safeRemoveItem(STORAGE_KEYS.FILE_ID);
+    safeRemoveItem(STORAGE_KEYS.FILE_LINK);
   }
 }
 
 export function getStoredFileLink(): string | null {
-  return localStorage.getItem(STORAGE_KEYS.FILE_LINK);
+  return safeGetItem(STORAGE_KEYS.FILE_LINK);
 }
 
 export function setStoredFileLink(link: string | null): void {
   if (link) {
-    localStorage.setItem(STORAGE_KEYS.FILE_LINK, link);
+    safeSetItem(STORAGE_KEYS.FILE_LINK, link);
   } else {
-    localStorage.removeItem(STORAGE_KEYS.FILE_LINK);
+    safeRemoveItem(STORAGE_KEYS.FILE_LINK);
   }
 }
 
 export function getLastSyncTime(): string | null {
-  return localStorage.getItem(STORAGE_KEYS.LAST_SYNC_TIME);
+  return safeGetItem(STORAGE_KEYS.LAST_SYNC_TIME);
 }
 
 export function setLastSyncTime(isoString: string): void {
-  localStorage.setItem(STORAGE_KEYS.LAST_SYNC_TIME, isoString);
+  safeSetItem(STORAGE_KEYS.LAST_SYNC_TIME, isoString);
 }
 
 export function isAutoSyncEnabled(): boolean {
-  const stored = localStorage.getItem(STORAGE_KEYS.AUTO_SYNC);
+  const stored = safeGetItem(STORAGE_KEYS.AUTO_SYNC);
   return stored !== 'false';
 }
 
 export function setAutoSyncEnabled(enabled: boolean): void {
-  localStorage.setItem(STORAGE_KEYS.AUTO_SYNC, enabled ? 'true' : 'false');
+  safeSetItem(STORAGE_KEYS.AUTO_SYNC, enabled ? 'true' : 'false');
 }
 
 // Dynamically load Google Identity Services script
