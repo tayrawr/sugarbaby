@@ -208,12 +208,29 @@ export function setAutoSyncEnabled(enabled: boolean): void {
   safeSetItem(STORAGE_KEYS.AUTO_SYNC, enabled ? 'true' : 'false');
 }
 
+// Detect if running as an installed standalone PWA
+export function isStandalonePwa(): boolean {
+  if (typeof window === 'undefined') return false;
+  return (
+    window.matchMedia('(display-mode: standalone)').matches ||
+    (window.navigator as any).standalone === true
+  );
+}
+
 // Dynamically load Google Identity Services script
 let gisScriptLoadingPromise: Promise<void> | null = null;
 
 export function loadGisScript(): Promise<void> {
+  if (typeof window === 'undefined') {
+    return Promise.resolve();
+  }
+
   if ((window as any).google?.accounts?.oauth2) {
     return Promise.resolve();
+  }
+
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    return Promise.reject(new Error('Device is currently offline.'));
   }
 
   if (gisScriptLoadingPromise) {
@@ -244,6 +261,11 @@ export function loadGisScript(): Promise<void> {
   return gisScriptLoadingPromise;
 }
 
+// Pre-warm GIS script in background when browser is online
+if (typeof window !== 'undefined' && typeof navigator !== 'undefined' && navigator.onLine) {
+  loadGisScript().catch(() => {});
+}
+
 // Fetch user profile info with access token
 export async function fetchGoogleUserProfile(accessToken: string): Promise<{
   email: string;
@@ -266,6 +288,10 @@ export async function fetchGoogleUserProfile(accessToken: string): Promise<{
 
 // Request access token using Google Identity Services Token Client
 export async function requestGoogleAccessToken(promptUser = true): Promise<StoredTokenData> {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    throw new Error('Device is offline. Cloud sync will resume when connection is restored.');
+  }
+
   await loadGisScript();
 
   const clientId = getActiveClientId();

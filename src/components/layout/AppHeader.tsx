@@ -6,6 +6,7 @@ import {
   Cloud,
   CloudCheck,
   CloudAlert,
+  CloudOff,
   RefreshCw,
   Zap,
 } from 'lucide-react';
@@ -76,6 +77,22 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
         >
           <Cloud className="w-3.5 h-3.5" />
           {!isMobile && <span>Local</span>}
+        </button>
+      );
+    }
+
+    if (syncState.status === 'offline' && syncState.isLinked) {
+      return (
+        <button
+          type="button"
+          onClick={onOpenSync}
+          className={`${
+            isMobile ? 'p-2' : 'px-2.5 py-1.5'
+          } rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-slate-300 text-xs font-semibold flex items-center gap-1.5 transition-colors`}
+          title="Offline mode: All logs are saved locally and will sync to Google Drive when reconnected."
+        >
+          <CloudOff className="w-3.5 h-3.5 text-slate-400" />
+          {!isMobile && <span>Offline (Saved)</span>}
         </button>
       );
     }

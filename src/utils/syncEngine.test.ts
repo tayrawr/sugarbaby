@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { mergeHouseholdPayloads, isDefaultSampleData } from './syncEngine';
+import { mergeHouseholdPayloads, isDefaultSampleData, getSyncState, updateSyncState } from './syncEngine';
+import { isStandalonePwa } from './googleDrive';
 import type { HouseholdDataPayload, Pet } from '../types';
 
 describe('Sync Engine & 3-Way Reconciliation Seam', () => {
@@ -17,6 +18,21 @@ describe('Sync Engine & 3-Way Reconciliation Seam', () => {
     scheduledPmTime: '20:00',
     createdAt: '2026-01-01T00:00:00.000Z',
   };
+
+  describe('isStandalonePwa', () => {
+    it('returns false when window or display-mode matchMedia is not standalone', () => {
+      expect(isStandalonePwa()).toBe(false);
+    });
+  });
+
+  describe('Sync State Management', () => {
+    it('updates and retrieves sync state accurately', () => {
+      updateSyncState({ status: 'offline', errorMessage: 'Offline (changes saved locally).' });
+      const state = getSyncState();
+      expect(state.status).toBe('offline');
+      expect(state.errorMessage).toBe('Offline (changes saved locally).');
+    });
+  });
 
   describe('isDefaultSampleData', () => {
     it('returns true when payload contains only untouched sample data', () => {

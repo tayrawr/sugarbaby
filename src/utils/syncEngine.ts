@@ -258,6 +258,15 @@ export async function synchronizeWithGoogleDrive(
     return false;
   }
 
+  // If client is offline, transition gracefully to offline state without throwing
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    updateSyncState({
+      status: 'offline',
+      errorMessage: 'Offline (changes saved locally).',
+    });
+    return false;
+  }
+
   if (currentSyncState.status === 'syncing') {
     return false;
   }
