@@ -6,6 +6,7 @@ import { db, initializeDatabase, recordTombstone } from '../../db';
 import { exportToCsv, exportCompleteBackupJson, restoreCompleteBackupJson, downloadFile } from '../../utils/export';
 import { triggerDebouncedAutoSync } from '../../utils/syncEngine';
 import { clearStoredToken, setStoredFileId } from '../../utils/googleDrive';
+import { PwaInstallSettingsCard } from '../common/PwaInstallPrompt';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -372,8 +373,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         {/* Data Backup & Export Section */}
         <div className="pt-3 border-t border-slate-800 space-y-2.5">
           <div className="text-xs font-bold text-slate-300 flex items-center justify-between">
-            <span>Data Backup & Clinical Export</span>
+            <span>Mobile App & Data Backup</span>
           </div>
+
+          <PwaInstallSettingsCard />
 
           {onOpenSync && (
             <button

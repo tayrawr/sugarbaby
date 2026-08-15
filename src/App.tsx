@@ -28,6 +28,7 @@ import { AddPetModal } from './components/modals/AddPetModal';
 import { GoogleDriveSyncModal } from './components/modals/GoogleDriveSyncModal';
 import { synchronizeWithGoogleDrive, triggerDebouncedAutoSync } from './utils/syncEngine';
 import { isGoogleDriveLinked } from './utils/googleDrive';
+import { PwaInstallPrompt } from './components/common/PwaInstallPrompt';
 
 export const App: React.FC = () => {
   const [isDbReady, setIsDbReady] = useState(false);
@@ -250,6 +251,9 @@ export const App: React.FC = () => {
 
       {/* Main Content Area */}
       <main className="max-w-6xl mx-auto w-full px-4 sm:px-6 py-5 space-y-5 flex-1">
+        {/* PWA Install Banner */}
+        <PwaInstallPrompt />
+
         {/* Active Cycle Countdown Card */}
         <CycleTimerCard pet={pet} lastDose={lastDose} />
 

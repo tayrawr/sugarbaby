@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { mergeHouseholdPayloads, isDefaultSampleData, getSyncState, updateSyncState } from './syncEngine';
-import { isStandalonePwa } from './googleDrive';
+import { isStandalonePwa, isIosDevice } from './platform';
 import type { HouseholdDataPayload, Pet } from '../types';
 
 describe('Sync Engine & 3-Way Reconciliation Seam', () => {
@@ -19,9 +19,13 @@ describe('Sync Engine & 3-Way Reconciliation Seam', () => {
     createdAt: '2026-01-01T00:00:00.000Z',
   };
 
-  describe('isStandalonePwa', () => {
+  describe('PWA Device Detection Helpers', () => {
     it('returns false when window or display-mode matchMedia is not standalone', () => {
       expect(isStandalonePwa()).toBe(false);
+    });
+
+    it('identifies non-iOS default test environment correctly', () => {
+      expect(isIosDevice()).toBe(false);
     });
   });
 
